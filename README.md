@@ -22,7 +22,7 @@ DaVinci Resolve does not require XML when you only need the converted clips in t
 
 ## Requirements
 
-- macOS 14 or later
+- macOS 15 or later
 - Final Cut Pro or DaVinci Resolve, for XML timeline import
 
 The distributed app is self-contained: it does not require Python, FFmpeg, or ImageMagick.

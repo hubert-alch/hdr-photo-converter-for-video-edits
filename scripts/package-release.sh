@@ -6,6 +6,8 @@ BUILD_DIR="$ROOT_DIR/build/release"
 APP_NAME="HDR Photo Converter for Video Editors"
 BUNDLE_ID="com.forlovegame.hdr-photo-converter"
 VERSION="${VERSION:-0.1.0}"
+DEPLOYMENT_TARGET="${DEPLOYMENT_TARGET:-15.0}"
+ARCH="${ARCH:-$(uname -m)}"
 APP_BUNDLE="$BUILD_DIR/$APP_NAME.app"
 CONTENTS_DIR="$APP_BUNDLE/Contents"
 MACOS_DIR="$CONTENTS_DIR/MacOS"
@@ -46,8 +48,10 @@ WORKER_SOURCES=(
 rm -rf "$BUILD_DIR"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 
-swiftc -O -parse-as-library "${APP_SOURCES[@]}" -o "$APP_EXECUTABLE"
-swiftc -O -parse-as-library "${WORKER_SOURCES[@]}" -o "$WORKER_EXECUTABLE"
+export MACOSX_DEPLOYMENT_TARGET="$DEPLOYMENT_TARGET"
+
+swiftc -O -parse-as-library -target "$ARCH-apple-macos$DEPLOYMENT_TARGET" "${APP_SOURCES[@]}" -o "$APP_EXECUTABLE"
+swiftc -O -parse-as-library -target "$ARCH-apple-macos$DEPLOYMENT_TARGET" "${WORKER_SOURCES[@]}" -o "$WORKER_EXECUTABLE"
 
 cp "$ROOT_DIR/Assets/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
 
@@ -75,7 +79,7 @@ cat > "$CONTENTS_DIR/Info.plist" <<PLIST
     <key>CFBundleVersion</key>
     <string>$VERSION</string>
     <key>LSMinimumSystemVersion</key>
-    <string>14.0</string>
+    <string>$DEPLOYMENT_TARGET</string>
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>NSSupportsAutomaticGraphicsSwitching</key>
