@@ -36,36 +36,57 @@ struct SettingsPanel: View {
             .padding(10)
             .background(.background, in: RoundedRectangle(cornerRadius: 8))
 
-            HStack(alignment: .top, spacing: 14) {
-                SettingField(title: "Still Duration", value: $store.durationText, suffix: "seconds")
-                    .frame(width: 190)
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .top, spacing: 14) {
+                    SettingField(title: "Still Duration", value: $store.durationText, suffix: "seconds")
+                        .frame(width: 190)
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Export Format")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                    Picker("Export Format", selection: $store.exportFormat) {
-                        ForEach(ExportFormat.allCases) { format in
-                            Text(format.title).tag(format)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Export Format")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        Picker("Export Format", selection: $store.exportFormat) {
+                            ForEach(ExportFormat.allCases) { format in
+                                Text(format.title).tag(format)
+                            }
                         }
+                        .labelsHidden()
+                        .frame(width: 220)
+                        Text(store.exportFormat.detail)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 220, alignment: .leading)
                     }
-                    .labelsHidden()
-                    .frame(width: 220)
-                    Text(store.exportFormat.detail)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .frame(width: 220, alignment: .leading)
                 }
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Toggle("Scan folders recursively", isOn: $store.recursive)
-                    Toggle("Create a new project timeline", isOn: $store.createProjectTimeline)
-                    Toggle("Open FCPXML in Final Cut Pro", isOn: $store.openFinalCut)
+                HStack(alignment: .top, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Import Target")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        Picker("Import Target", selection: $store.timelineTarget) {
+                            ForEach(TimelineImportTarget.allCases) { target in
+                                Text(target.title).tag(target)
+                            }
+                        }
+                        .labelsHidden()
+                        .frame(width: 220)
+                        Text(store.timelineTarget.detail)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .frame(width: 220, alignment: .leading)
+                    }
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Toggle("Scan folders recursively", isOn: $store.recursive)
+                        Toggle("Create a new project timeline", isOn: $store.createProjectTimeline)
+                        Toggle("Open XML after conversion", isOn: $store.shouldOpenGeneratedXML)
+                    }
+                    .toggleStyle(.checkbox)
                 }
-                .toggleStyle(.checkbox)
             }
 
-            ModeExplanation(createProject: store.createProjectTimeline)
+            ModeExplanation(target: store.timelineTarget, createProject: store.createProjectTimeline)
         }
         .padding(16)
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 8))
@@ -94,6 +115,7 @@ struct SettingField: View {
 }
 
 struct ModeExplanation: View {
+    let target: TimelineImportTarget
     let createProject: Bool
 
     var body: some View {
@@ -103,9 +125,7 @@ struct ModeExplanation: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text(createProject ? "Project timeline mode" : "Existing project mode")
                     .font(.callout.weight(.semibold))
-                Text(createProject
-                     ? "The FCPXML creates a new timeline with all converted clips arranged in sequence."
-                     : "The FCPXML imports converted clips into an event. Drag them into any existing project.")
+                Text(target.modeDetail(createProject: createProject))
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -167,11 +187,13 @@ struct ConversionActions: View {
             return "\(store.sources.count) source item(s) ready"
         case .running:
             return "Conversion is running"
-        case .succeeded(let xml):
-            return "FCPXML ready: \(xml.lastPathComponent)"
-        case .stopped(let xml?):
-            return "Stopped. Partial FCPXML ready: \(xml.lastPathComponent)"
-        case .stopped(nil):
+        case .succeeded(let xml, let target):
+            return "\(target.title) XML ready: \(xml.lastPathComponent)"
+        case .stopped(let xml?, let target?):
+            return "Stopped. Partial \(target.title) XML ready: \(xml.lastPathComponent)"
+        case .stopped(let xml?, nil):
+            return "Stopped. Partial XML ready: \(xml.lastPathComponent)"
+        case .stopped(nil, _):
             return "Stopped before a file was completed"
         case .failed(let message):
             return message
@@ -180,7 +202,7 @@ struct ConversionActions: View {
 
     private var canOpenXML: Bool {
         switch store.status {
-        case .succeeded, .stopped(.some):
+        case .succeeded, .stopped(.some, _):
             return true
         default:
             return false

@@ -17,7 +17,7 @@ struct BatchRoutingIntegrationTests {
             duration: 0.2,
             recursive: false,
             createProjectTimeline: false,
-            openFinalCut: false
+            openGeneratedXML: false
         )
         let xml = try BatchConversionService(workerURL: worker).convert(request: request) { _ in }
         let xmlText = try String(contentsOf: xml, encoding: .utf8)
@@ -46,7 +46,7 @@ struct BatchRoutingIntegrationTests {
             duration: 4,
             recursive: false,
             createProjectTimeline: false,
-            openFinalCut: false
+            openGeneratedXML: false
         )
         let conversionStarted = DispatchSemaphore(value: 0)
         let conversionFinished = DispatchSemaphore(value: 0)

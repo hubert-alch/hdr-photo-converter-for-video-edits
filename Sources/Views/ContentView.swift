@@ -54,7 +54,7 @@ struct HeaderView: View {
             VStack(alignment: .leading, spacing: 3) {
                 Text("HDR Photo Converter for Video Editors")
                     .font(.title2.weight(.semibold))
-                Text("Open-source HDR gain-map photo conversion for video editing, including Final Cut Pro.")
+                Text("Open-source HDR gain-map photo conversion for Final Cut Pro and DaVinci Resolve.")
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }

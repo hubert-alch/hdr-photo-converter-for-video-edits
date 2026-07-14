@@ -9,9 +9,10 @@ final class ConversionStore: ObservableObject {
         .appendingPathComponent("Movies/HDR Photo Converter")
     @Published var durationText = "4"
     @Published var exportFormat: ExportFormat = .hevcHLG
+    @Published var timelineTarget: TimelineImportTarget = .finalCutPro
     @Published var recursive = false
     @Published var createProjectTimeline = false
-    @Published var openFinalCut = false
+    @Published var shouldOpenGeneratedXML = false
     @Published var logs: [String] = ["Add ISO Ultra HDR JPEG or Apple HDR HEIC photos, then convert them to compact HLG HEVC movies."]
     @Published var status: ConversionStatus = .idle
 
@@ -98,8 +99,9 @@ final class ConversionStore: ObservableObject {
             duration: duration,
             recursive: recursive,
             createProjectTimeline: createProjectTimeline,
-            openFinalCut: openFinalCut,
-            exportFormat: exportFormat
+            openGeneratedXML: shouldOpenGeneratedXML,
+            exportFormat: exportFormat,
+            timelineTarget: timelineTarget
         )
         status = .running
         append("Starting conversion...")
@@ -108,9 +110,9 @@ final class ConversionStore: ObservableObject {
                 let xml = try service.convert(request: request) { line in
                     Task { @MainActor in self.append(line) }
                 }
-                Task { @MainActor in self.status = .succeeded(xml) }
+                Task { @MainActor in self.status = .succeeded(xml, request.timelineTarget) }
             } catch NativeConversionError.cancelled(let xml) {
-                Task { @MainActor in self.status = .stopped(xml) }
+                Task { @MainActor in self.status = .stopped(xml, request.timelineTarget) }
             } catch {
                 Task { @MainActor in self.status = .failed(error.localizedDescription) }
             }
@@ -129,9 +131,9 @@ final class ConversionStore: ObservableObject {
 
     func openGeneratedXML() {
         switch status {
-        case .succeeded(let xml):
+        case .succeeded(let xml, _):
             NSWorkspace.shared.open(xml)
-        case .stopped(let xml?):
+        case .stopped(let xml?, _):
             NSWorkspace.shared.open(xml)
         default:
             break

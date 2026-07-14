@@ -98,14 +98,80 @@ enum ExportFormat: String, CaseIterable, Identifiable {
     }
 }
 
+enum TimelineImportTarget: String, CaseIterable, Identifiable {
+    case finalCutPro = "final-cut-pro"
+    case davinciResolve = "davinci-resolve"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .finalCutPro:
+            return "Final Cut Pro"
+        case .davinciResolve:
+            return "DaVinci Resolve"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .finalCutPro:
+            return "Creates an FCPXML package for Final Cut Pro import."
+        case .davinciResolve:
+            return "Creates a Resolve-friendly FCPXML timeline; drag the movies directly if no timeline is needed."
+        }
+    }
+
+    var xmlFileName: String {
+        switch self {
+        case .finalCutPro:
+            return "HDR_Photo_Batch_HLG.fcpxml"
+        case .davinciResolve:
+            return "HDR_Photo_Batch_HLG_DaVinci_Resolve.fcpxml"
+        }
+    }
+
+    var eventName: String {
+        switch self {
+        case .finalCutPro:
+            return "HDR Photo Batch"
+        case .davinciResolve:
+            return "HDR Photo Batch Resolve"
+        }
+    }
+
+    var projectName: String {
+        switch self {
+        case .finalCutPro:
+            return "HDR Photo Batch HLG"
+        case .davinciResolve:
+            return "HDR Photo Batch HLG Resolve"
+        }
+    }
+
+    func modeDetail(createProject: Bool) -> String {
+        switch (self, createProject) {
+        case (.finalCutPro, true):
+            return "The FCPXML creates a new timeline with all converted clips arranged in sequence."
+        case (.finalCutPro, false):
+            return "The FCPXML imports converted clips into an event. Drag them into any existing project."
+        case (.davinciResolve, true):
+            return "Import the FCPXML with File > Import Timeline to recreate the clip order in Resolve."
+        case (.davinciResolve, false):
+            return "Resolve can import the converted movies directly. Use timeline mode when you want XML-based sequence import."
+        }
+    }
+}
+
 struct ConversionRequest {
     let sources: [URL]
     let outputDirectory: URL
     let duration: Double
     let recursive: Bool
     let createProjectTimeline: Bool
-    let openFinalCut: Bool
+    let openGeneratedXML: Bool
     let exportFormat: ExportFormat
+    let timelineTarget: TimelineImportTarget
 
     init(
         sources: [URL],
@@ -113,16 +179,18 @@ struct ConversionRequest {
         duration: Double,
         recursive: Bool,
         createProjectTimeline: Bool,
-        openFinalCut: Bool,
-        exportFormat: ExportFormat = .hevcHLG
+        openGeneratedXML: Bool,
+        exportFormat: ExportFormat = .hevcHLG,
+        timelineTarget: TimelineImportTarget = .finalCutPro
     ) {
         self.sources = sources
         self.outputDirectory = outputDirectory
         self.duration = duration
         self.recursive = recursive
         self.createProjectTimeline = createProjectTimeline
-        self.openFinalCut = openFinalCut
+        self.openGeneratedXML = openGeneratedXML
         self.exportFormat = exportFormat
+        self.timelineTarget = timelineTarget
     }
 }
 
@@ -138,8 +206,8 @@ struct Clip {
 enum ConversionStatus: Equatable {
     case idle
     case running
-    case succeeded(URL)
-    case stopped(URL?)
+    case succeeded(URL, TimelineImportTarget)
+    case stopped(URL?, TimelineImportTarget?)
     case failed(String)
 
     var label: String {

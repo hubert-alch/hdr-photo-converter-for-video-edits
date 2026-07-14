@@ -1,7 +1,7 @@
 import Foundation
 
 enum FCPXMLWriter {
-    static func write(clips: [Clip], to url: URL, createProject: Bool) throws {
+    static func write(clips: [Clip], to url: URL, createProject: Bool, target: TimelineImportTarget) throws {
         var resources: [String] = []
         var eventItems: [String] = []
         var offset = 0
@@ -15,8 +15,10 @@ enum FCPXMLWriter {
             eventItems.append(assetClipElement(asset: asset, name: name, offset: offset, duration: duration))
             offset += clip.durationFrames
         }
-        let body = createProject ? projectBody(items: eventItems, totalFrames: offset) : eventItems.joined(separator: "\n")
-        let xml = document(resources: resources.joined(separator: "\n"), body: body)
+        let body = createProject
+            ? projectBody(items: eventItems, totalFrames: offset, target: target)
+            : eventItems.joined(separator: "\n")
+        let xml = document(resources: resources.joined(separator: "\n"), body: body, target: target)
         try xml.write(to: url, atomically: true, encoding: .utf8)
     }
 
@@ -40,9 +42,9 @@ enum FCPXMLWriter {
         """
     }
 
-    private static func projectBody(items: [String], totalFrames: Int) -> String {
+    private static func projectBody(items: [String], totalFrames: Int, target: TimelineImportTarget) -> String {
         """
-              <project name="HDR Photo Batch HLG">
+              <project name="\(xmlEscape(target.projectName))">
                 <sequence duration="\(totalFrames)/25s" tcStart="0s" tcFormat="NDF" audioLayout="stereo" audioRate="48k">
                   <spine>
         \(items.joined(separator: "\n"))
@@ -52,7 +54,7 @@ enum FCPXMLWriter {
         """
     }
 
-    private static func document(resources: String, body: String) -> String {
+    private static func document(resources: String, body: String, target: TimelineImportTarget) -> String {
         """
         <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE fcpxml>
@@ -61,7 +63,7 @@ enum FCPXMLWriter {
         \(resources)
           </resources>
           <library colorProcessing="wide-hdr">
-            <event name="HDR Photo Batch">
+            <event name="\(xmlEscape(target.eventName))">
         \(body)
             </event>
           </library>

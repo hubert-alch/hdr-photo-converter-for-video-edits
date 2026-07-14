@@ -72,8 +72,13 @@ final class BatchConversionService {
             }
             throw NativeConversionError.badJPEG("No convertible HDR gain-map photos found.")
         }
-        let xml = request.outputDirectory.appendingPathComponent("HDR_Photo_Batch_HLG.fcpxml")
-        try FCPXMLWriter.write(clips: clips, to: xml, createProject: request.createProjectTimeline)
+        let xml = request.outputDirectory.appendingPathComponent(request.timelineTarget.xmlFileName)
+        try FCPXMLWriter.write(
+            clips: clips,
+            to: xml,
+            createProject: request.createProjectTimeline,
+            target: request.timelineTarget
+        )
         let stopped = wasCancelled || cancellation.isRequested
         try writeReport(clips: clips, skipped: skipped, stopped: stopped, outputDirectory: request.outputDirectory)
         onLine("Wrote \(xml.path)")
@@ -82,7 +87,7 @@ final class BatchConversionService {
             throw NativeConversionError.cancelled(xml)
         }
         onLine("Converted \(clips.count) file(s), skipped \(skipped.count).")
-        if request.openFinalCut {
+        if request.openGeneratedXML {
             NSWorkspace.shared.open(xml)
         }
         return xml
