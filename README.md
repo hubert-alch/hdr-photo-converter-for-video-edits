@@ -58,6 +58,28 @@ git push origin main v0.1.0
 
 The tag workflow creates the release automatically.
 
+### Developer ID signing and notarization
+
+The package script automatically uses the local Developer ID identity when it is available:
+
+```zsh
+VERSION=0.1.0 scripts/package-release.sh
+```
+
+For GitHub Actions Developer ID signing, configure these repository secrets:
+
+- `DEVELOPER_ID_CERTIFICATE_BASE64`: base64-encoded `.p12` containing `Developer ID Application: FORLOVE GAME LIMITED (WP5P2JDX6U)`
+- `DEVELOPER_ID_CERTIFICATE_PASSWORD`: password for that `.p12`
+- `KEYCHAIN_PASSWORD`: temporary CI keychain password
+
+For GitHub Actions notarization, also configure:
+
+- `APPLE_NOTARIZATION_APPLE_ID`: Apple Developer account email
+- `APPLE_NOTARIZATION_PASSWORD`: app-specific password for that Apple ID
+- `APPLE_TEAM_ID`: `WP5P2JDX6U`
+
+With those secrets present, the tag workflow signs with Developer ID, submits the `.dmg` to Apple notary service, staples the ticket, and uploads the notarized `.dmg` and `.zip` to the GitHub Release.
+
 ## Scope
 
 The ISO Ultra HDR JPEG path currently targets the common sRGB-base, monochrome gain-map layout. Full support for every ISO gain-map parameter combination, per-channel gain maps, and non-sRGB ISO inputs remains future work. Apple HDR gain-map HEIC is decoded through Core Image's gain-map support.
