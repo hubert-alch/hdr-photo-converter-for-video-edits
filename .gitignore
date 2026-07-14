@@ -13,6 +13,19 @@ xcuserdata/
 *.dSYM/
 *.pkg
 
+# Signing certificates, private keys, and local credentials
+*.p12
+*.pfx
+*.cer
+*.crt
+*.pem
+*.key
+*.p8
+*.mobileprovision
+.env
+.env.*
+!.env.example
+
 # Local logs and temporary files
 *.log
 tmp/
