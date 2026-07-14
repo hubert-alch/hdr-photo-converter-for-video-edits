@@ -1,0 +1,67 @@
+name: Release macOS App
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version, for example 0.1.0"
+        required: false
+        default: "0.1.0"
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    name: Package macOS app
+    runs-on: macos-14
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Resolve version
+        id: version
+        shell: zsh
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          elif [[ -n "${{ github.event.inputs.version || '' }}" ]]; then
+            version="${{ github.event.inputs.version }}"
+          else
+            version="0.1.0"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build release package
+        shell: zsh
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: scripts/package-release.sh
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hdr-photo-converter-${{ steps.version.outputs.version }}-macos
+          path: |
+            build/release/*.zip
+            build/release/*.dmg
+          if-no-files-found: error
+
+      - name: Create GitHub release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/release/*.zip
+            build/release/*.dmg
+          generate_release_notes: true
