@@ -30,7 +30,7 @@ jobs:
 
       - name: Resolve version
         id: version
-        shell: zsh
+        shell: bash
         run: |
           set -euo pipefail
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
@@ -43,10 +43,10 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Build release package
-        shell: zsh
+        shell: bash
         env:
           VERSION: ${{ steps.version.outputs.version }}
-        run: scripts/package-release.sh
+        run: zsh scripts/package-release.sh
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
