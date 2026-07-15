@@ -2,16 +2,8 @@ name: Release macOS App
 
 on:
   push:
-    branches:
-      - main
     tags:
       - "v*"
-  workflow_dispatch:
-    inputs:
-      version:
-        description: "Release version, for example 0.1.0"
-        required: false
-        default: "0.1.0"
 
 permissions:
   contents: write
@@ -20,10 +12,11 @@ jobs:
   package:
     name: Package macOS app
     runs-on: macos-15
+    environment: release
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
@@ -33,53 +26,59 @@ jobs:
         env:
           DEVELOPER_ID_CERTIFICATE_BASE64: ${{ secrets.DEVELOPER_ID_CERTIFICATE_BASE64 }}
           DEVELOPER_ID_CERTIFICATE_PASSWORD: ${{ secrets.DEVELOPER_ID_CERTIFICATE_PASSWORD }}
-          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           set -euo pipefail
-          if [[ -z "${DEVELOPER_ID_CERTIFICATE_BASE64:-}" ]]; then
-            echo "Developer ID certificate secret not configured; package script will use ad-hoc signing."
-            exit 0
+          if [[ -z "${DEVELOPER_ID_CERTIFICATE_BASE64:-}" || -z "${DEVELOPER_ID_CERTIFICATE_PASSWORD:-}" || -z "${APPLE_API_KEY_BASE64:-}" || -z "${APPLE_API_KEY_ID:-}" || -z "${APPLE_API_ISSUER_ID:-}" || -z "${APPLE_TEAM_ID:-}" ]]; then
+            echo "Developer ID and App Store Connect team API key secrets are required for a release." >&2
+            exit 1
           fi
 
-          keychain_password="${KEYCHAIN_PASSWORD:-$(uuidgen)}"
+          keychain_password="$(uuidgen)"
           certificate_path="$RUNNER_TEMP/developer-id.p12"
           keychain_path="$RUNNER_TEMP/app-signing.keychain-db"
 
-          echo "$DEVELOPER_ID_CERTIFICATE_BASE64" | base64 --decode > "$certificate_path"
+          printf '%s' "$DEVELOPER_ID_CERTIFICATE_BASE64" | base64 --decode > "$certificate_path"
           security create-keychain -p "$keychain_password" "$keychain_path"
           security set-keychain-settings -lut 21600 "$keychain_path"
           security unlock-keychain -p "$keychain_password" "$keychain_path"
-          security import "$certificate_path" -P "$DEVELOPER_ID_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain_path"
+          security import "$certificate_path" -P "$DEVELOPER_ID_CERTIFICATE_PASSWORD" -t cert -f pkcs12 -k "$keychain_path" -T /usr/bin/codesign
           security list-keychain -d user -s "$keychain_path"
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain_path"
-          security find-identity -v -p codesigning "$keychain_path"
+          signing_identity="$(security find-identity -v -p codesigning "$keychain_path" | awk -F '"' '/Developer ID Application: FORLOVE GAME LIMITED \(WP5P2JDX6U\)/ { print $2; exit }')"
+          if [[ -z "$signing_identity" ]]; then
+            echo "Required Developer ID signing identity was not imported." >&2
+            exit 1
+          fi
+
+          echo "TEMP_CERTIFICATE_PATH=$certificate_path" >> "$GITHUB_ENV"
+          echo "TEMP_KEYCHAIN_PATH=$keychain_path" >> "$GITHUB_ENV"
 
       - name: Resolve version
         id: version
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
-            version="${GITHUB_REF_NAME#v}"
-          elif [[ -n "${{ github.event.inputs.version || '' }}" ]]; then
-            version="${{ github.event.inputs.version }}"
-          else
-            version="0.1.0"
-          fi
+          version="${GITHUB_REF_NAME#v}"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Build release package
         shell: bash
         env:
           VERSION: ${{ steps.version.outputs.version }}
-          NOTARIZE: ${{ secrets.APPLE_NOTARIZATION_APPLE_ID != '' && secrets.APPLE_NOTARIZATION_PASSWORD != '' && '1' || '0' }}
-          APPLE_ID: ${{ secrets.APPLE_NOTARIZATION_APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_NOTARIZATION_PASSWORD }}
-          TEAM_ID: ${{ secrets.APPLE_TEAM_ID || 'WP5P2JDX6U' }}
+          REQUIRE_DISTRIBUTION_SIGNING: "1"
+          NOTARIZE: "1"
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: zsh scripts/package-release.sh
 
       - name: Upload workflow artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: hdr-photo-converter-${{ steps.version.outputs.version }}-macos
           path: |
@@ -88,10 +87,18 @@ jobs:
           if-no-files-found: error
 
       - name: Create GitHub release
-        if: github.ref_type == 'tag'
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            build/release/*.zip
-            build/release/*.dmg
-          generate_release_notes: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "$GITHUB_REF_NAME" build/release/*.zip build/release/*.dmg --generate-notes
+
+      - name: Remove temporary signing material
+        if: always()
+        shell: bash
+        run: |
+          rm -f "${TEMP_CERTIFICATE_PATH:-}"
+          if [[ -n "${TEMP_KEYCHAIN_PATH:-}" ]]; then
+            security delete-keychain "$TEMP_KEYCHAIN_PATH" || true
+          fi

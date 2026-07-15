@@ -47,9 +47,9 @@ The script creates:
 
 ## GitHub Release
 
-GitHub Actions builds the same release package on every push to `main` and uploads it as a workflow artifact.
+GitHub Actions builds a distributable package only for a version tag. The release job is gated by the protected GitHub `release` environment, so its signing and notarization secrets are unavailable until the deployment is approved.
 
-To create a GitHub Release with downloadable `.zip` and `.dmg` assets, push a version tag:
+To create a GitHub Release with downloadable notarized `.zip` and `.dmg` assets, push a version tag:
 
 ```zsh
 git tag v0.1.0
@@ -66,19 +66,19 @@ The package script automatically uses the local Developer ID identity when it is
 VERSION=0.1.0 scripts/package-release.sh
 ```
 
-For GitHub Actions Developer ID signing, configure these repository secrets:
+For GitHub Actions Developer ID signing, configure these **`release` environment secrets**:
 
 - `DEVELOPER_ID_CERTIFICATE_BASE64`: base64-encoded `.p12` containing `Developer ID Application: FORLOVE GAME LIMITED (WP5P2JDX6U)`
 - `DEVELOPER_ID_CERTIFICATE_PASSWORD`: password for that `.p12`
-- `KEYCHAIN_PASSWORD`: temporary CI keychain password
 
-For GitHub Actions notarization, also configure:
+For GitHub Actions notarization, also configure an **App Store Connect team API key** (not an individual API key):
 
-- `APPLE_NOTARIZATION_APPLE_ID`: Apple Developer account email
-- `APPLE_NOTARIZATION_PASSWORD`: app-specific password for that Apple ID
+- `APPLE_API_KEY_BASE64`: base64-encoded App Store Connect API key `.p8`
+- `APPLE_API_KEY_ID`: App Store Connect API key ID
+- `APPLE_API_ISSUER_ID`: App Store Connect issuer ID
 - `APPLE_TEAM_ID`: `WP5P2JDX6U`
 
-With those secrets present, the tag workflow signs with Developer ID, submits the `.dmg` to Apple notary service, staples the ticket, and uploads the notarized `.dmg` and `.zip` to the GitHub Release.
+The workflow fails closed when any required signing or notarization credential is absent. It signs the app with hardened runtime, notarizes and staples the app before creating the `.zip`, then notarizes and staples the `.dmg`. Temporary keychains, certificates, and API key files are removed after the job.
 
 ## Scope
 
