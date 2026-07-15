@@ -12,21 +12,54 @@ enum HDRPhotoInspector {
         // ImageIO may refine an Ultra HDR JPEG to a HEIF-like type after properties are read.
         let typeName = (CGImageSourceGetType(source) as String?) ?? url.pathExtension.lowercased()
         let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] ?? [:]
-        let width = properties[kCGImagePropertyPixelWidth] as? Int ?? 0
-        let height = properties[kCGImagePropertyPixelHeight] as? Int ?? 0
+        let encodedWidth = properties[kCGImagePropertyPixelWidth] as? Int ?? 0
+        let encodedHeight = properties[kCGImagePropertyPixelHeight] as? Int ?? 0
+        let orientation = imageOrientation(properties: properties)
+        let (width, height) = displayDimensions(
+            encodedWidth: encodedWidth,
+            encodedHeight: encodedHeight,
+            orientation: orientation
+        )
 
-        if isJPEG(typeName: typeName), let isoInfo = try isoUltraHDRInfo(url, typeName: typeName, width: width, height: height) {
+        if isJPEG(typeName: typeName), let isoInfo = try isoUltraHDRInfo(
+            url,
+            typeName: typeName,
+            width: width,
+            height: height,
+            orientation: orientation
+        ) {
             return isoInfo
         }
 
         if CGImageSourceCopyAuxiliaryDataInfoAtIndex(source, 0, kCGImageAuxiliaryDataTypeHDRGainMap) != nil {
-            return HDRPhotoInfo(kind: .appleHDRGainMap, typeName: typeName, width: width, height: height, gainLog2: 0)
+            return HDRPhotoInfo(
+                kind: .appleHDRGainMap,
+                typeName: typeName,
+                width: width,
+                height: height,
+                orientation: orientation,
+                gainLog2: 0
+            )
         }
 
         if isSupportedStill(typeName: typeName, url: url) {
-            return HDRPhotoInfo(kind: .standardDynamicRange, typeName: typeName, width: width, height: height, gainLog2: 0)
+            return HDRPhotoInfo(
+                kind: .standardDynamicRange,
+                typeName: typeName,
+                width: width,
+                height: height,
+                orientation: orientation,
+                gainLog2: 0
+            )
         }
-        return HDRPhotoInfo(kind: .unsupported, typeName: typeName, width: width, height: height, gainLog2: 0)
+        return HDRPhotoInfo(
+            kind: .unsupported,
+            typeName: typeName,
+            width: width,
+            height: height,
+            orientation: orientation,
+            gainLog2: 0
+        )
     }
 
     static func isCandidate(_ url: URL) -> Bool {
@@ -34,7 +67,13 @@ enum HDRPhotoInspector {
         return ["jpg", "jpeg", "heic", "heif"].contains(extensionName)
     }
 
-    private static func isoUltraHDRInfo(_ url: URL, typeName: String, width: Int, height: Int) throws -> HDRPhotoInfo? {
+    private static func isoUltraHDRInfo(
+        _ url: URL,
+        typeName: String,
+        width: Int,
+        height: Int,
+        orientation: CGImagePropertyOrientation
+    ) throws -> HDRPhotoInfo? {
         let data = try Data(contentsOf: url, options: .mappedIfSafe)
         guard data.range(of: isoUltraHDRMarker) != nil,
               let parts = try? JPEGGainMapReader.embeddedJPEGs(data), parts.count >= 2 else {
@@ -45,8 +84,27 @@ enum HDRPhotoInspector {
             typeName: typeName,
             width: width,
             height: height,
+            orientation: orientation,
             gainLog2: JPEGGainMapReader.parseGainLog2(parts[1].data)
         )
+    }
+
+    private static func imageOrientation(properties: [CFString: Any]) -> CGImagePropertyOrientation {
+        let value = (properties[kCGImagePropertyOrientation] as? NSNumber)?.uint32Value ?? CGImagePropertyOrientation.up.rawValue
+        return CGImagePropertyOrientation(rawValue: value) ?? .up
+    }
+
+    private static func displayDimensions(
+        encodedWidth: Int,
+        encodedHeight: Int,
+        orientation: CGImagePropertyOrientation
+    ) -> (Int, Int) {
+        switch orientation {
+        case .left, .leftMirrored, .right, .rightMirrored:
+            return (encodedHeight, encodedWidth)
+        default:
+            return (encodedWidth, encodedHeight)
+        }
     }
 
     private static func isJPEG(typeName: String) -> Bool {

@@ -29,8 +29,8 @@ final class ProResExporter {
         let parts = try JPEGGainMapReader.embeddedJPEGs(source)
         let width = photo.width
         let height = photo.height
-        let base = try ImageDecoder.decodeRGBA(parts[0].data, width: width, height: height)
-        let gain = try ImageDecoder.decodeRGBA(parts[1].data, width: width, height: height)
+        let base = try ImageDecoder.decodeRGBA(parts[0].data, width: width, height: height, orientation: photo.orientation)
+        let gain = try ImageDecoder.decodeRGBA(parts[1].data, width: width, height: height, orientation: photo.orientation)
         return try writeMovie(source: source, output: output, duration: duration, photo: photo, exportFormat: exportFormat) { buffer in
             HLGComposer.fillPixelBuffer(buffer, base: base, gain: gain, width: width, height: height, gainLog2: photo.gainLog2)
         }
@@ -44,7 +44,7 @@ final class ProResExporter {
         exportFormat: ExportFormat
     ) throws -> Clip {
         try writeMovie(source: source, output: output, duration: duration, photo: photo, exportFormat: exportFormat) { buffer in
-            try AppleGainMapComposer.fillPixelBuffer(buffer, source: source)
+            try AppleGainMapComposer.fillPixelBuffer(buffer, source: source, orientation: photo.orientation)
         }
     }
 

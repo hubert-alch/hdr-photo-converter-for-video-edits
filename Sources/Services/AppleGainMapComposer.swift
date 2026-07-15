@@ -6,13 +6,19 @@ import Foundation
 enum AppleGainMapComposer {
     private static let linearRec2020 = CGColorSpace(name: CGColorSpace.extendedLinearITUR_2020)!
 
-    static func fillPixelBuffer(_ buffer: CVPixelBuffer, source: URL) throws {
+    static func fillPixelBuffer(
+        _ buffer: CVPixelBuffer,
+        source: URL,
+        orientation: CGImagePropertyOrientation
+    ) throws {
         guard let base = CIImage(contentsOf: source),
               let gainMap = CIImage(contentsOf: source, options: [.auxiliaryHDRGainMap: true]) else {
             throw NativeConversionError.decodeFailed
         }
 
-        let hdrImage = base.applyingGainMap(gainMap)
+        let hdrImage = base
+            .applyingGainMap(gainMap)
+            .oriented(forExifOrientation: Int32(orientation.rawValue))
         let context = CIContext(options: [
             .workingColorSpace: linearRec2020,
             .outputColorSpace: linearRec2020,

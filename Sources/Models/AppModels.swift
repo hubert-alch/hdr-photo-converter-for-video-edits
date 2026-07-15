@@ -1,4 +1,5 @@
 import Foundation
+import ImageIO
 
 enum HDRPhotoKind: Hashable {
     case isoUltraHDRJPEG
@@ -27,6 +28,7 @@ struct HDRPhotoInfo: Hashable {
     let typeName: String
     let width: Int
     let height: Int
+    let orientation: CGImagePropertyOrientation
     let gainLog2: Float
 
     var dimensions: String { "\(width) x \(height)" }
